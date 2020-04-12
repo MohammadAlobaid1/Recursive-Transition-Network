@@ -1,0 +1,138 @@
+A Class for RTNs
+================
+
+Background
+----------
+
+A **recursive transition network** (RTN) is a finite collection of FSAs, which we may also call **subautomata**.
+In contrast to a normal FSA, subautomata have names, and their edges maybe be labeled with the name of a subautomaton, including their own.
+When we encounter an edge from state `q` to state `r`, labeled with the subautomaton `A`, we switch into the initial state of `A` (assuming there is exactly one).
+Once we reach a final state of `A`, we return to state `r`.
+Every RTN has an **initial subautomaton**, and the RTN always starts in the initial state of the initial subautomaton.
+
+
+Your tasks
+----------
+
+This is a long exercise with several subtasks.
+That is not the ideal format for assignments as getting stuck on one task can mean getting stuck on subsequent tasks.
+But in the real world, few problems are small and self-contained, and you need to get experience with working on larger tasks.
+
+
+### RTN class
+
+Write a class that implements RTNs of deterministic FSAs (which only have one initial state, but may have multiple final states).
+The class should take two parameters:
+
+- the collection of subautomata
+- a specification of the initial subautomaton
+
+I suggest that you implement the collection as a dictionary, with subautomata names as keys and FSA objects as values.
+Then the value for the initial subautomaton can be just a key from the dictionary.
+Here is an example of what this might look like, assuming a specific implementation of FSAs:
+
+```python
+>>> fsa_dict = {'A': FSA(alphabet={'a', 'b'}, states={'1', '2'}, initial={'1'}, final={'2'}, transitions={('1', 'a', '1'), ('1', 'b', '2')}), '__S': FSA(alphabet={'A'}, states={'1', '2', '3'}, initial={'1'}, final={'3'}, transitions={('1', 'A', '2'), ('2', 'A', '3')})})
+>>> rtn = RTN(subautomata=fsa_dict, initial='S')
+```
+
+
+### Add an example RTN
+
+Add code for loading an example RTN that is equivalent to the following context-free grammar:
+
+1. `S  -> DP VP`
+1. `DP -> Det NP`
+1. `NP -> A NP | NP PP | N`
+1. `VP -> V | V NP`
+1. `PP -> P NP`
+1. `Det -> the`
+1. `N -> singer | balcony`
+1. `V -> ate`
+1. `P -> on`
+
+
+### Alphabet problems (optional)
+
+The suggested implementation treats the names of subautomata as part of the alphabet.
+But that creates a problem.
+For instance, if we have a subautomaton named `S`, then the RTN cannot handle strings like `We allow S in the alphabet` because we cannot distinguish an edge with the alphabet symbol `S` from an edge for the subautomaton `S`.
+We can greatly reduce the problem by picking subautomaton names like `___S` --- how likely is that to show up in a string?
+
+But that kind of naming is ugly and, ultimately, a hack rather than a real solution.
+Come up with a better solution that allows subautomata to have names that are also alphabet symbols.
+Then incorporate that into your RTN class.
+
+
+### Add a consistency check
+
+An RTN is **consistent** iff every edge is labeled with an alphabet symbol or the name of a subautomaton of the RTN.
+So if an edge references a subautomaton that does not exist, the RTN is inconsistent.
+
+1. Implement a method `is_consistent` that returns `True` if the RTN is consistent, and `False` otherwise.
+1. Implement a method `missing_subautomata` that returns a list of all missing subautomata.
+
+*Hint*: `is_consistent` can be defined in a single line using `missing_subautomata`.
+
+
+### Add a recognition method
+
+Define a method `.accepts` that determines for any given string whether it is recognized by the RTN.
+Just as with your FSA class, the method should return `True` if the string is accepted by the RTN and `False` otherwise.
+
+*Caution*: Recognition with RTNs is more complex than with deterministic FSAs.
+
+Even if an RTN consists only of deterministic subautomata, recognition is not guaranteed to be deterministic if some subautomata have multiple final states.
+Suppose we have an RTN with subautomata that correspond to the following CFG rules:
+
+1. `S -> XP YP | XP ZP`
+1. `XP -> x | x a`
+1. `YP -> y | a y`
+1. `ZP -> z`
+
+Given the string `x a y`, the `XP` automaton could be left after `x` or after `a` and either one is fine as `YP` could be `y` or `ay`.
+But if the string is `x a z`, `a` must be part of the `XP` automaton.
+But there is no way of telling until we have enter the `ZP` automaton and realize that `a` cannot be read by this automaton.
+
+In addition, the specification format of an RTN can hide non-determinism.
+Consider the CFG rules below:
+
+1. `S -> XP z | YP z`
+1. `XP -> z x`
+1. `YP -> z y`
+
+As an RTN, this may look deterministic because the initial state of the `S` subautomaton has two edges, one labeled with `XP`, the other with `YP`.
+But in fact, when a string starts with `z`, it is unclear whether we have to call the `XP` automaton or the `YP` automaton.
+We have to make a non-deterministic choice.
+
+The best way to handle this is to keep a record of all the transitions taken so far.
+If we reach a dead end, we go back to the most recent point where we could have made a different decision, and try that instead.
+This can still result in infinite loops, but don't worry about that for now.
+Good, robust RTN parsing is hard!
+
+
+### Show the trace for a string
+
+Add a method that shows the computational trace of the RTN in recognizing some string.
+Since your `.accepts` method keeps a record of the recognition process, you already have everything you need to output the computational trace.
+
+
+### Conversion to FSAs
+
+Implement a method `.to_fsa` that converts the RTN to an FSA with at most `n` levels of self-embedding.
+For instance, if `n=2`, then an NP automaton can call another instance of the NP automaton, which can call another instance of the NP automaton, but then it ends.
+If `n=0`, then the NP automaton can never call another instance of the NP automaton.
+Note that this bound also applies if the recursion is indirect, e.g. the NP automaton calling the PP automaton which calls another instance of the NP automaton.
+
+If you still find this confusing, think about it in terms of the trees that arise from the RTN's computational trace.
+If `n=1`, then a subtree labeled NP can contain another subtree labeled NP, but that subtree may not contain any subtrees labeled NP.
+
+
+
+### FSA trace (optional)
+
+Try to implement a counterpart of `.trace` that works with the compiled out FSA.
+For any given string that can be recognized by the FSA, this method should return exactly the same output as `.trace` even though it operates over the FSA rather than the RTN.
+
+You will have to make sure the states in the compiled out FSA follow a naming convention that reflects the structure of the RTN.
+If your states are just called 1, 2, 3, ..., then you won't be able to infer the computational trace.
