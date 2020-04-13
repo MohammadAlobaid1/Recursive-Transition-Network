@@ -50,6 +50,7 @@ Add code for loading an example RTN that is equivalent to the following context-
 1. `N -> singer | balcony`
 1. `V -> ate`
 1. `P -> on`
+1. `A -> old`
 
 
 ### Alphabet problems (optional)
